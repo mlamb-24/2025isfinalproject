@@ -1,0 +1,19 @@
+body{
+    font-family: lato, serif;
+}
+h1{
+    font-family: waltograph42, serif;
+}
+h2{
+    font-family: waltograph42, serif;
+}
+.post-location{
+    font-style: italic;
+    color: rgb(94, 157, 163);
+}
+.post-title{
+    color:rgb(94, 157, 163);
+}
+.tableauPlaceholder{
+   margin: 0 auto;
+}

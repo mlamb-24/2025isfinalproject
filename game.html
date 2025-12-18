@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Disney Adventure Game</title>
+    <link rel="stylesheet" href="css/gamestyles.css">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-light" id="mainNav">
+        <div class="container px-4 px-lg-5"><i class="fas fa-bars"></i>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarResponsive">
+                <ul class="navbar-nav ms-auto py-4 py-lg-0">
+                    <li class="nav-item"><a class="nav-link px-lg-3 py-3 py-lg-4" href="index.html">Home</a></li>
+                    <li class="nav-item"><a class="nav-link px-lg-3 py-3 py-lg-4" href="about.html">Tableau</a></li>
+                    <li class="nav-item"><a class="nav-link px-lg-3 py-3 py-lg-4" href="game.html">Game</a></li>
+                    <li class="nav-item"><a class="nav-link px-lg-3 py-3 py-lg-4" href="scratch.html">My Passion</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+      <div class="game-container">
+        <h1>✨ Disney Adventure Game ✨</h1>
+        <p>Score: <span id="score">0</span></p>
+
+        <!-- HIGH SCORES CONTAINER -->
+        <div id="high-scores-container">
+            <h3>🏆 High Scores</h3>
+            <ul id="high-scores-list">
+                <!-- Scores rendered here by JavaScript -->
+            </ul>
+        </div>
+        <!-- END HIGH SCORES CONTAINER -->
+
+        <!-- --- GUESSING SCREEN --- -->
+        <div id="guessing-screen">
+            <h2>Guess the Character!</h2>
+            <div id="emoji-display">❓❓❓</div>
+            <p id="hint-text"></p>
+            <div>
+                <input type="text" id="guess-input" placeholder="Character's Name (e.g., Mulan)">
+                <button id="submit-guess">Guess</button>
+            </div>
+            <p id="message"></p>
+        </div>
+
+        <!-- --- OBSTACLE GAME SCREEN --- -->
+        <div id="obstacle-screen">
+            <div class="castle">🏰</div>
+            <div class="player" id="player-char">🐭</div>
+            <!-- Obstacles and Stars will be appended here by JavaScript -->
+        </div>
+
+        <!-- --- GAME OVER / VICTORY MODAL --- -->
+        <div id="modal" style="display:none;">
+            <h2 id="modal-title"></h2>
+            <p id="modal-message"></p>
+            <button id="modal-next-button" onclick="startGame()">Next Round</button>
+        </div>
+
+        <!-- --- CONFETTI OVERLAY --- -->
+        <div class="confetti-overlay"></div>
+    </div>
+
+    <script>
+        // --- GAME DATA ---
+        const MASTER_CHARACTERS = [
+            { name: "Mulan", emojis: "🌸⚔️🐉", playerEmoji: "👧" },
+            { name: "Simba", emojis: "🦁👑☀️", playerEmoji: "🦁" },
+            { name: "Elsa", emojis: "❄️👸🧤", playerEmoji: "👸" },
+            { name: "Aladdin", emojis: "🐒🧞‍♂️🕌", playerEmoji: "🐒" },
+            { name: "Ariel", emojis: "🧜‍♀️🦀🐠", playerEmoji: "🧜‍♀️" },
+            { name: "Buzz Lightyear", emojis: "👨‍🚀🚀🌌", playerEmoji: "👨‍🚀" },
+            { name: "Stitch", emojis: "👽💙🌺", playerEmoji: "👽" },
+            { name: "Woody", emojis: "🤠🐴👢", playerEmoji: "🤠" },
+            { name: "Moana", emojis: "🌊🛶🐔", playerEmoji: "🛶" },
+            { name: "Peter Pan", emojis: "🧚‍♂️🪶🗺️", playerEmoji: "👦" },
+            { name: "Rapunzel", emojis: "👸💇‍♀️🦎", playerEmoji: "👩" },
+            { name: "Baymax", emojis: "🤖❤️🏥", playerEmoji: "🥚" },
+            { name: "Tiana", emojis: "🐸👑⚜️", playerEmoji: "🐸" },
+            { name: "Hercules", emojis: "💪⚡️🏺", playerEmoji: "🏋️" },
+            { name: "Cinderella", emojis: "🐭👠🎃", playerEmoji: "🐭" },
+        ]; // Total 15 characters
+        
+        const STAR_TYPES = [
+            // Green Star: Smallest, 5 points
+            { emoji: "⭐️", class: "star-green", points: 5, size: 20 },
+            // Blue Star: Medium, 10 points
+            { emoji: "🌟", class: "star-blue", points: 10, size: 25 },
+            // Yellow Star: Largest, 15 points
+            { emoji: "✨", class: "star-yellow", points: 15, size: 30 },
+        ];
+
+        // --- GLOBAL GAME STATE ---
+        let currentRound = 0;
+        let score = 0;
+        // RENAMED and CHANGED LOGIC: Tracks total losses since the last full game reset, regardless of wins.
+        let lossesInCurrentRun = 0; 
+        let currentCharacterList = []; // The shuffled list for the current game
+        let roundPoints = 0; // Points collected from stars in the current obstacle round
+        let currentGameData = {};
+        let gameLoop;
+        let playerX = 0;
+        let playerY = 0;
+        const playerSize = 40;
+        // Difficulty Increase: Faster obstacles! BASE SPEED INCREASED TO 4.0
+        const obstacleSpeed = 4.0; 
+        const maxObstacles = 10;
+        let obstacles = []; // Holds both 'poison' and 'star' items
+        let isGameOver = false;
+
+        // --- NEW HIGH SCORE VARIABLES ---
+        const HIGH_SCORES_KEY = 'disneyEmojiGameHighScores';
+        let highScores = [];
+
+        // --- DOM ELEMENTS ---
+        const scoreDisplay = document.getElementById('score');
+        const guessingScreen = document.getElementById('guessing-screen');
+        const obstacleScreen = document.getElementById('obstacle-screen');
+        const emojiDisplay = document.getElementById('emoji-display');
+        const guessInput = document.getElementById('guess-input');
+        const submitGuessBtn = document.getElementById('submit-guess');
+        const messageDisplay = document.getElementById('message');
+        const playerChar = document.getElementById('player-char');
+        const modal = document.getElementById('modal');
+        const modalTitle = document.getElementById('modal-title');
+        const modalMessage = document.getElementById('modal-message');
+        const confettiOverlay = document.querySelector('.confetti-overlay');
+        const highScoresList = document.getElementById('high-scores-list');
+
+        // --- UTILITY FUNCTIONS ---
+        // Fisher-Yates shuffle algorithm
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            return array;
+        }
+
+        // --- HIGH SCORE FUNCTIONS ---
+        function loadHighScores() {
+            try {
+                const storedScores = localStorage.getItem(HIGH_SCORES_KEY);
+                highScores = storedScores ? JSON.parse(storedScores) : [];
+                // Ensure scores are sorted descendingly
+                highScores.sort((a, b) => b.score - a.score);
+            } catch (error) {
+                console.error("Error loading high scores:", error);
+                highScores = [];
+            }
+            displayHighScores();
+        }
+
+        function saveHighScores() {
+            try {
+                // Keep only top 10 scores
+                highScores.sort((a, b) => b.score - a.score);
+                highScores = highScores.slice(0, 10); 
+                localStorage.setItem(HIGH_SCORES_KEY, JSON.stringify(highScores));
+            } catch (error) {
+                console.error("Error saving high scores:", error);
+            }
+            displayHighScores();
+        }
+
+        function displayHighScores() {
+            highScoresList.innerHTML = ''; // Clear the list
+            if (highScores.length === 0) {
+                const item = document.createElement('li');
+                item.textContent = 'No scores yet! Be the first!';
+                item.style.opacity = '0.7';
+                highScoresList.appendChild(item);
+                return;
+            }
+
+            highScores.forEach((entry) => {
+                const item = document.createElement('li');
+                
+                const nameSpan = document.createElement('span');
+                nameSpan.textContent = entry.name;
+                
+                const scoreSpan = document.createElement('span');
+                scoreSpan.textContent = entry.score;
+
+                item.appendChild(nameSpan);
+                item.appendChild(scoreSpan);
+                highScoresList.appendChild(item);
+            });
+        }
+
+        function checkAndRecordHighScore(finalScore) {
+            // Check if the list is not full, or if the score beats the lowest score
+            if (highScores.length < 10 || finalScore > highScores[highScores.length - 1].score) {
+                
+                // Show prompt for name entry
+                modal.innerHTML = ''; // Clear existing content
+                
+                const title = document.createElement('h2');
+                title.textContent = "⭐️ NEW HIGH SCORE! ⭐️";
+                modal.appendChild(title);
+                
+                const message = document.createElement('p');
+                message.textContent = `You scored ${finalScore}! Enter your name to record your achievement:`;
+                modal.appendChild(message);
+
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.id = 'high-score-name';
+                input.placeholder = 'Your Name (e.g., KingMidas)'; // Updated placeholder
+                // Removed input.maxLength = 3;
+                
+                // High score input field style update (increased width)
+                input.style.cssText = 'margin-top: 10px; margin-bottom: 10px; padding: 10px; text-align: center; width: 200px; border: 3px solid #FFD700; border-radius: 8px; font-weight: bold;';
+                modal.appendChild(input);
+
+                const submitButton = document.createElement('button');
+                submitButton.textContent = "Submit Score & Start New Game"; // Changed button text for clarity
+                submitButton.onclick = () => {
+                    let name = document.getElementById('high-score-name').value.trim();
+                    if (!name) {
+                        name = "PLAYER"; // Default name if empty
+                    }
+                    
+                    // Record the new score (no character limit enforced)
+                    highScores.push({ name: name, score: finalScore });
+                    saveHighScores(); 
+                    
+                    // Force a full game reset after saving score
+                    currentRound = 0;
+                    score = 0;
+                    lossesInCurrentRun = 0; // Reset new loss counter
+
+                    startGame();
+                };
+                modal.appendChild(submitButton);
+
+                // Set focus on input when modal is shown
+                setTimeout(() => input.focus(), 50);
+
+                return true; // Indicates high score process initiated
+            }
+            return false; // Indicates no high score achieved
+        }
+        
+        // Function to reset the modal content to its default structure
+        function resetModalContent() {
+             modal.innerHTML = `
+                <h2 id="modal-title"></h2>
+                <p id="modal-message"></p>
+                <button id="modal-next-button" onclick="startGame()">Next Round</button>
+            `;
+            // Re-map the DOM elements after innerHTML change
+            modalTitle.textContent = document.getElementById('modal-title').textContent;
+            modalMessage.textContent = document.getElementById('modal-message').textContent;
+            // The button is visible by default now.
+        }
+
+        // --- CORE GAME FUNCTIONS ---
+
+        function startGame() {
+            // Hide modal and stop effects
+            modal.style.display = 'none';
+            stopConfetti();
+
+            // Check if this is the start of a brand new game or a restart after completion
+            if (currentRound === 0) {
+                // Shuffle the master list for a fresh, random set of rounds
+                currentCharacterList = shuffleArray([...MASTER_CHARACTERS]); 
+                
+                score = 0;
+                lossesInCurrentRun = 0; // Reset loss counter for new game
+                loadHighScores(); // Load scores at the start of a new game
+            }
+
+            // Check if we finished all characters in the current shuffled list
+            if (currentRound >= currentCharacterList.length) {
+                modalTitle.textContent = "🏆 Game Completed! 🏆";
+                modalMessage.textContent = `You finished all ${currentCharacterList.length} rounds! Final Score: ${score}. Starting over with a new random set of characters!`;
+                modal.style.display = 'block';
+                currentRound = 0; // Set to 0 to trigger a fresh shuffle on next click
+                return; 
+            }
+
+            // Setup for the new round
+            currentGameData = currentCharacterList[currentRound]; // Use the shuffled list
+            isGameOver = false;
+            roundPoints = 0; // Reset bonus points for the new round
+            scoreDisplay.textContent = score;
+
+            // Start the Guessing Phase
+            startGuessingPhase();
+        }
+
+        // --- GUESSING PHASE ---
+
+        function startGuessingPhase() {
+            guessingScreen.style.display = 'block';
+            obstacleScreen.style.display = 'none';
+
+            emojiDisplay.textContent = currentGameData.emojis;
+            messageDisplay.textContent = 'Can you guess the character?';
+            guessInput.value = '';
+            guessInput.focus();
+
+            // Remove previous listeners to avoid stacking
+            submitGuessBtn.removeEventListener('click', handleGuess);
+            guessInput.removeEventListener('keypress', handleEnterKey);
+
+            // Add new listeners
+            submitGuessBtn.addEventListener('click', handleGuess);
+            guessInput.addEventListener('keypress', handleEnterKey);
+        }
+
+        function handleEnterKey(event) {
+            if (event.key === 'Enter') {
+                handleGuess();
+            }
+        }
+
+        function handleGuess() {
+            const guess = guessInput.value.trim().toLowerCase();
+            const characterName = currentGameData.name.toLowerCase();
+
+            if (guess === characterName) {
+                messageDisplay.textContent = `✅ Correct! It's ${currentGameData.name}! Prepare for the obstacle course!`;
+                // Remove listeners temporarily
+                submitGuessBtn.removeEventListener('click', handleGuess);
+                guessInput.removeEventListener('keypress', handleEnterKey);
+                setTimeout(startObstaclePhase, 1500);
+            } else {
+                messageDisplay.textContent = "❌ Incorrect! Try again.";
+                guessInput.value = '';
+                guessInput.focus();
+            }
+        }
+
+        // --- OBSTACLE PHASE ---
+
+        function startObstaclePhase() {
+            guessingScreen.style.display = 'none';
+            obstacleScreen.style.display = 'block';
+
+            // Set the player character emoji
+            playerChar.textContent = currentGameData.playerEmoji;
+
+            // Initial player position (center bottom)
+            const screenWidth = obstacleScreen.clientWidth;
+            const screenHeight = obstacleScreen.clientHeight;
+            playerX = (screenWidth - playerSize) / 2;
+            playerY = screenHeight - playerSize - 5;
+            playerChar.style.left = `${playerX}px`;
+            playerChar.style.top = `${playerY}px`;
+
+            // Reset obstacles
+            obstacles = [];
+            obstacleScreen.querySelectorAll('.obstacle, .star').forEach(o => o.remove());
+
+            // Add mouse move listener to the game screen
+            obstacleScreen.addEventListener('mousemove', movePlayer);
+
+            // Start the game loop
+            gameLoop = setInterval(updateGame, 1000 / 60); // 60 FPS
+        }
+
+        function movePlayer(event) {
+            if (isGameOver) return;
+
+            const rect = obstacleScreen.getBoundingClientRect();
+            let newX = event.clientX - rect.left - playerSize / 2;
+            let newY = event.clientY - rect.top - playerSize / 2;
+
+            // Clamp X and Y positions within screen bounds
+            newX = Math.max(0, Math.min(newX, rect.width - playerSize));
+            newY = Math.max(0, Math.min(newY, rect.height - playerSize));
+
+            playerX = newX;
+            playerY = newY;
+
+            playerChar.style.left = `${playerX}px`;
+            playerChar.style.top = `${playerY}px`;
+        }
+        
+        // Helper function to show floating text feedback (e.g., "+10 Points!")
+        function showMessage(text) {
+            const tempMsg = document.createElement('div');
+            tempMsg.textContent = text;
+            tempMsg.style.cssText = `
+                position: absolute; 
+                top: ${playerY}px; 
+                left: ${playerX}px; 
+                color: #fff; 
+                background: rgba(30, 144, 255, 0.9); /* Dodger Blue background for point message */
+                padding: 5px 8px; 
+                border-radius: 5px; 
+                font-size: 1em;
+                font-weight: bold;
+                pointer-events: none;
+                z-index: 50;
+                animation: fadeUp 1.5s forwards;
+            `;
+            obstacleScreen.appendChild(tempMsg);
+
+            setTimeout(() => tempMsg.remove(), 1500);
+        }
+
+        function updateGame() {
+            if (isGameOver) {
+                clearInterval(gameLoop);
+                return;
+            }
+
+            // 1. Spawn Items (Obstacles and Stars)
+            const poisonCount = obstacles.filter(o => o.type === 'poison').length;
+            // Difficulty Increase: Slightly higher spawn chance 
+            const obstacleSpawnChance = 0.06 * (1 - (poisonCount / maxObstacles));
+            
+            if (Math.random() < obstacleSpawnChance) {
+                createObstacle();
+            }
+            
+            // Spawn stars less frequently
+            if (Math.random() < 0.03) {
+                createStar();
+            }
+            
+            // INCREASED DIFFICULTY: current speed scales faster with rounds
+            const currentSpeed = obstacleSpeed + (currentRound * 0.3); // Increased incremental difficulty from 0.2 to 0.3
+
+            // 2. Move Items and Check Collisions
+            for (let i = obstacles.length - 1; i >= 0; i--) {
+                const item = obstacles[i];
+                
+                // Skip collected stars (though they should be removed immediately)
+                if (item.type === 'star' && item.isCollected) continue; 
+                
+                item.y += currentSpeed;
+
+                // Update DOM position
+                item.element.style.top = `${item.y}px`;
+
+                // Check for collision
+                if (checkCollision(playerX, playerY, item.x, item.y, item.size)) {
+                    if (item.type === 'poison') {
+                        gameOver(false); // Player hit a poison bottle
+                        return;
+                    } else if (item.type === 'star') {
+                        // Collect Star
+                        roundPoints += item.points;
+                        item.isCollected = true;
+                        
+                        // Provide visual feedback
+                        showMessage(`+${item.points} Points!`);
+                        
+                        item.element.remove();
+                        obstacles.splice(i, 1); // Remove star immediately
+                        continue; 
+                    }
+                }
+
+                // Remove if off-screen (bottom)
+                if (item.y > obstacleScreen.clientHeight) {
+                    item.element.remove();
+                    obstacles.splice(i, 1);
+                }
+            }
+
+            // 3. Check for Victory
+            if (checkVictory()) {
+                return; // Exit updateGame immediately after victory is processed
+            }
+        }
+
+        function createObstacle() {
+            const screenWidth = obstacleScreen.clientWidth;
+            const size = 30; // Obstacle size
+            const x = Math.random() * (screenWidth - size);
+
+            const element = document.createElement('div');
+            element.className = 'obstacle';
+            element.textContent = '🧪'; // Poison bottle emoji
+            element.style.width = `${size}px`;
+            element.style.height = `${size}px`;
+            element.style.left = `${x}px`;
+            element.style.top = `-50px`; // Start off-screen
+
+            obstacleScreen.appendChild(element);
+            // Add item of type 'poison'
+            obstacles.push({ x: x, y: -50, size: size, element: element, type: 'poison' }); 
+        }
+        
+        function createStar() {
+            const screenWidth = obstacleScreen.clientWidth;
+            const starType = STAR_TYPES[Math.floor(Math.random() * STAR_TYPES.length)];
+            
+            const size = starType.size;
+            const x = Math.random() * (screenWidth - size);
+
+            const element = document.createElement('div');
+            // Apply both the base 'star' class and the color class
+            element.className = `star ${starType.class}`;
+            element.textContent = starType.emoji;
+            element.style.width = `${size}px`;
+            element.style.height = `${size}px`;
+            element.style.left = `${x}px`;
+            element.style.top = `-50px`; // Start off-screen
+
+            obstacleScreen.appendChild(element);
+            
+            // Add star object, marked as type 'star'
+            obstacles.push({ 
+                x: x, 
+                y: -50, 
+                size: size, 
+                element: element, 
+                type: 'star', 
+                points: starType.points,
+                isCollected: false
+            });
+        }
+
+        function checkCollision(px, py, ox, oy, osize) {
+            // AABB collision check
+            const playerRect = {
+                left: px,
+                right: px + playerSize,
+                top: py,
+                bottom: py + playerSize
+            };
+            const obstacleRect = {
+                left: ox,
+                right: ox + osize,
+                top: oy,
+                bottom: oy + osize
+            };
+
+            // Check for overlap
+            return playerRect.left < obstacleRect.right &&
+                   playerRect.right > obstacleRect.left &&
+                   playerRect.top < obstacleRect.bottom &&
+                   playerRect.bottom > obstacleRect.top;
+        }
+
+        function checkVictory() {
+            const castleTop = 5; // Castle position is 5px from the top
+            // Reduced win margin 
+            const winMargin = 30; // Player must get closer to the top to win
+
+            if (playerY <= castleTop + winMargin) {
+                gameOver(true); // Victory!
+                return true; // Indicate that victory was handled
+            }
+            return false; // No victory this frame
+        }
+
+
+        // --- END OF ROUND ---
+
+        function gameOver(isVictory) {
+            if (isGameOver) return;
+
+            isGameOver = true;
+            clearInterval(gameLoop);
+            obstacleScreen.removeEventListener('mousemove', movePlayer);
+
+            // Clear all items from the screen
+            obstacleScreen.querySelectorAll('.obstacle, .star').forEach(o => o.remove());
+            
+            // Reset modal content to default structure before using it
+            resetModalContent();
+            const nextButton = document.getElementById('modal-next-button');
+
+            if (isVictory) {
+                // VICTORY LOGIC: Automatic transition to next round 
+                // IMPORTANT: lossesInCurrentRun is NOT reset here, only on full game reset (3 losses)
+                
+                const totalRoundScore = 100 + roundPoints; 
+                score += totalRoundScore;
+                scoreDisplay.textContent = score;
+                
+                startConfetti();
+                
+                // Display non-interactive victory message briefly
+                modalTitle.textContent = "🥳 VICTORY! 👑";
+                modalMessage.textContent = `You reached the castle as ${currentGameData.name}! You scored ${totalRoundScore} points.`;
+                
+                // Hide the button and show an automatic message
+                nextButton.style.display = 'none'; 
+                const autoTransitionMessage = document.createElement('p');
+                autoTransitionMessage.id = 'auto-transition-message';
+                autoTransitionMessage.style.fontWeight = 'bold';
+                autoTransitionMessage.textContent = 'Next challenge loading in 2 seconds...';
+                modal.appendChild(autoTransitionMessage);
+
+                modal.style.display = 'block';
+
+                setTimeout(() => {
+                    // Clean up temporary message and button state
+                    const msgElement = document.getElementById('auto-transition-message');
+                    if (msgElement) msgElement.remove();
+                    nextButton.style.display = 'block';
+                    
+                    // Proceed to next round automatically
+                    currentRound++;
+                    startGame();
+                }, 2000); 
+                
+                return; // Exit immediately
+
+            } else {
+                // DEFEAT LOGIC
+                nextButton.style.display = 'block';
+                // Increment loss counter (regardless of prior wins)
+                lossesInCurrentRun++; 
+                
+                // Check if total losses in this run meet the game over condition
+                if (lossesInCurrentRun >= 3) {
+                    
+                    // --- Game Over: Check High Score Here (Only after 3 total losses) ---
+                    const isHighScore = checkAndRecordHighScore(score);
+                    
+                    if (isHighScore) {
+                        // High score process initiated. It handles the modal display and game reset upon button click.
+                        modal.style.display = 'block'; // Ensure modal is visible
+                        return; 
+                    } 
+                    
+                    // If NO high score, proceed with standard game over reset
+                    modalTitle.textContent = "❌ Game Over! ❌";
+                    modalMessage.textContent = `You failed to reach the castle ${lossesInCurrentRun} times! Your final score of ${score} will now be reset to 0. A new game with a new character list will begin.`;
+                    
+                    // Reset game state immediately after message 
+                    score = 0; 
+                    currentRound = 0; 
+                    lossesInCurrentRun = 0; // Reset loss counter
+                    
+                } else {
+                    // Regular loss, move to next round (requires user click)
+                    playerChar.textContent = '💀';
+                    
+                    modalTitle.textContent = "💥 Round Failed!";
+                    let message = `You were hit by a poison bottle 🧪.`;
+                    if (roundPoints > 0) {
+                        message += ` You collected ${roundPoints} bonus points but lost them!`;
+                    }
+                    message += ` You have accumulated ${lossesInCurrentRun} failure${lossesInCurrentRun > 1 ? 's' : ''} out of 3. Click 'Next Round' to continue.`;
+                    modalMessage.textContent = message;
+                    currentRound++;
+                }
+            }
+
+            // Ensure roundPoints is clean for the next round
+            roundPoints = 0; 
+
+            // Show modal if it hasn't been handled by the automatic transition or high score prompt
+            modal.style.display = 'block';
+        }
+
+
+        // --- CONFETTI EFFECT ---
+
+        function startConfetti() {
+            const colors = ['#ff00ff', '#00ffff', '#ffff00', '#00ff00', '#ff0000', '#ff8c00', '#4169e1'];
+            const confettiCount = 50;
+
+            // Define the simple animation in JS (or ideally, CSS keyframes) if not already present
+            if (!document.querySelector('style[data-key="confetti-keyframes"]')) {
+                const style = document.createElement('style');
+                style.setAttribute('data-key', 'confetti-keyframes');
+                style.innerHTML += `
+                    @keyframes fall {
+                        to { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+                    }
+                    @keyframes rotate {
+                        0% { transform: rotate(0deg); }
+                        100% { transform: rotate(360deg); }
+                    }
+                `;
+                document.head.appendChild(style);
+            }
+
+            for (let i = 0; i < confettiCount; i++) {
+                const confetti = document.createElement('div');
+                confetti.className = 'confetti';
+                confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                confetti.style.left = `${Math.random() * 100}%`;
+                confetti.style.top = `${-20 - Math.random() * 50}px`; // Start well above the screen
+                
+                // Randomize animation properties
+                const duration = 2 + Math.random() * 3;
+                const delay = Math.random() * 0.5;
+                confetti.style.animation = `fall ${duration}s linear ${delay}s forwards, rotate ${1 + Math.random() * 2}s linear infinite`;
+                
+                confettiOverlay.appendChild(confetti);
+            }
+            
+            // Auto-clear confetti after 5 seconds
+            setTimeout(stopConfetti, 5000);
+        }
+
+        function stopConfetti() {
+            confettiOverlay.innerHTML = '';
+        }
+
+        // --- INITIALIZATION ---
+        window.onload = startGame;
+    </script>
+</body>
+</html>

@@ -1,0 +1,39 @@
+body{
+    background-color: rgb(243, 194, 201);
+}
+.header{
+    width: 0 auto;
+  height: 150px;
+  background-color: lightpink;
+  border: 5px solid #333;
+}
+h1{
+    text-align: center;
+    padding: 20px;
+    font-family: 'Comic Sans MS', cursive, sans-serif;
+}
+h3{
+    text-align: center;
+    padding: 0px;
+}
+.movies{
+    width: fit-content;
+    height: fit-content;
+    background-color: aliceblue;
+    border: 2px solid #333;
+}
+.rides{
+    width: fit-content;
+    height: fit-content;
+    background-color: aliceblue;
+    border: 2px solid #333;
+}
+.snacks{
+    width: fit-content;
+    height: fit-content;
+    background-color: aliceblue;
+    border: 2px solid #333;
+}
+h2{
+    font-family: Comic Sans MS, cursive, sans-serif;
+}
